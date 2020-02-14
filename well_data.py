@@ -4,6 +4,25 @@ import numpy as np
 import random
 from scipy.special import psi, gammaln
 
+def logistic_h(v, theta_h):
+
+    h = theta_h[0]
+    a = theta_h[1]
+    b = theta_h[2]
+
+    
+    lp = 1 / (1 + np.exp(-(a * v + b)))
+    lm = 1 / (1 + np.exp(a * v + b))
+    H = h * lp
+
+    dH = np.zeros(3)
+    dH[0] = lp
+    lp_lm_v =  (lp * lm * v)
+    dH[1] = h * lp_lm_v
+    dH[2] = h * lp * lm
+    return  H, dH     
+
+
 def studentpdf(x, mu, var, nu):
 
     c = np.exp(gammaln(nu / 2 + 0.5) - gammaln(nu / 2)) * pow((nu * np.pi * var), -0.5)
@@ -41,34 +60,24 @@ def gaussian1d_predict(post_params, xnew, dpost_params):
     df = 2 * alphas
     
     pred, dtpdf = studentpdf(xnew, mus, predictive_variance, df)
+    dmu_dtheta = dpost_params[0]#[[2,1,0,3],0]
+    dkappa_dtheta = dpost_params[1]#[[2,1,0,3],1]
+    dalpha_dtheta = dpost_params[2]#[[2,1,0,3],2]
+    dbeta_dtheta = dpost_params[3]#[[2,1,0,3],3]
+    
+    dnu_dtheta = 2 * dalpha_dtheta
 
-# dmu_dtheta = permute(dpost_params(1, :, :), [3 2 1]); % N x 4
-# dkappa_dtheta = permute(dpost_params(2, :, :), [3 2 1]); % N x 4
-# dalpha_dtheta = permute(dpost_params(3, :, :), [3 2 1]); % N x 4
-# dbeta_dtheta = permute(dpost_params(4, :, :), [3 2 1]); % N x 4
+    dpv_dtheta = np.zeros(4)
+    for ii in range(4):
+        QRpart = (dbeta_dtheta[ii] * alphas - betas * dalpha_dtheta[ii]) / alphas ** 2
+        dpv_dtheta[ii] = -(betas / (alphas * kappas ** 2)) * dkappa_dtheta[ii] + (1 + 1 / kappas) * QRpart    
 
-# dnu_dtheta = 2 * dalpha_dtheta; % N x 4
-
-# % TODO use rmult and eliminate the for loop
-# dpv_dtheta = zeros(N, 4);
-# for ii = 1:4
-#   QRpart = (dbeta_dtheta(:, ii) .* alphas - betas .* dalpha_dtheta(:, ii)) ...
-#     ./ alphas .^ 2; % N x 1
-#   dpv_dtheta(:, ii) = -(betas ./ (alphas .* kappas .^ 2)) .* ...
-#     dkappa_dtheta(:, ii) + (1 + 1 ./ kappas) .* QRpart; % N x 1
-# end
-
-# % TODO use rmult and eliminate the for loop
-# dp_dtheta = zeros(N, 4);
-# for ii = 1:4
-#   % dp/dtheta_i = dp/dmu * dmu/dtheta_i + dp/dsigma2 * dsigma2/dtheta_i +
-#   % dp/dnu + dnu/dtheta_i
-#   % N x 1
-#   dp_dtheta(:, ii) = dtpdf(:, 1) .* dmu_dtheta(:, ii) + ...
-#     dtpdf(:, 2) .* dpv_dtheta(:, ii) + ...
-#     dtpdf(:, 3) .* dnu_dtheta(:, ii);
-# end
-# dpred = dp_dtheta;
+    dp_dtheta = np.zeros(4)
+    for ii in range(4):
+        dp_dtheta[ii] = dtpdf[0] * dmu_dtheta[ii] + dtpdf[1] * dpv_dtheta[ii] + dtpdf[2] * dnu_dtheta[ii]
+    dpred = dp_dtheta
+    
+    return pred, dpred
 
 
 def bocpd_deriv(theta_h, theta_m, X):
@@ -89,9 +98,29 @@ def bocpd_deriv(theta_h, theta_m, X):
     
     post_params, dmessage = gaussian1d_init(T + 1, D, theta_m)
     
-    print(X)
     for t in range(0,T):
         predprobs, dpredprobs = gaussian1d_predict(post_params, X[t], dmessage)
+        H, dH = logistic_h(np.arange(t+1)+1, theta_h)        
+        R[1:t + 1, t + 1] = R[:t, t] * predprobs * (1 - H)
+        print( dH)
+        for ii in range(num_hazard_params):
+            dR_h[1:t + 2, t + 1, ii] = predprobs * (dR_h[:t+1, t, ii]  * (1 - H) - R[:t+1, t] * dH[ii])
+            
+        print(np.linalg.norm(dR_h))
+
+
+
+
+#######################################continue here
+
+
+
+
+
+
+
+
+
 
 
 def rt_minimize(X, f, length, *varargin):
