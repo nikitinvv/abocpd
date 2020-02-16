@@ -1,3 +1,8 @@
 # abocpd
+Extract of Python functions from the matlab source code for evaluation of the BOCPS learning on the well data and compare RPA hand picked hyper-parameters. 
 
-Run python well_data.py
+## Test well_data
+
+```bash
+python well_data.py
+```
