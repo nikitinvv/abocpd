@@ -3,8 +3,10 @@
 import numpy as np
 import random
 from scipy.special import psi, gammaln
-
-def logistic_h(v, theta_h):
+from scipy.stats import norm
+import matplotlib.pyplot as plt
+    
+def logistic_h(v, theta_h, nargout=1):
 
     h = theta_h[0]
     a = theta_h[1]
@@ -13,6 +15,9 @@ def logistic_h(v, theta_h):
     lp = 1 / (1 + np.exp(-(a * v + b)))
     lm = 1 / (1 + np.exp(a * v + b))
     H = h * lp
+    if(nargout==1):
+        return H
+
     dH = np.zeros([len(lp),3])
     dH[:,0] = lp
     lp_lm_v =  (lp * lm * v)
@@ -20,11 +25,20 @@ def logistic_h(v, theta_h):
     dH[:,2] = h * lp * lm
     return  H, dH     
 
+def constant_h(v, theta_h, nargout=1):
 
-def studentpdf(x, mu, var, nu):
+    H = np.ones(v.shape)*theta_h
+    if(nargout==1):
+        return H
+    dH = np.ones(v.shape)
+    return  H, dH    
+
+def studentpdf(x, mu, var, nu, nargout=1):
     
     c = np.exp(gammaln(nu / 2 + 0.5) - gammaln(nu / 2)) * pow((nu * np.pi * var), -0.5)
     p = c * pow((1 + (1 / (nu * var)) * (x - mu) ** 2),(-(nu + 1) / 2))
+    if (nargout==1):    
+        return p
 
     N = len(mu)
     dp = np.zeros([N,3])
@@ -42,13 +56,14 @@ def studentpdf(x, mu, var, nu):
     dp[:,2] = .5 * p * dlogp
     return p,dp
 
-def gaussian1d_init(T, D, theta_m):
+def gaussian1D_init(T, D, theta_m, nargout=1):
     post_params = np.reshape(theta_m,[1,len(theta_m)])
+    if nargout==1: 
+        return post_params
     dmessage = np.reshape(np.eye(4),[4,4,1]) 
     return post_params, dmessage
 
-
-def gaussian1d_predict(post_params, xnew, dpost_params):
+def gaussian1D_predict(post_params, xnew, dpost_params=None, nargout=1):
     N = post_params.shape[0]    
     mus = post_params[:,0]
     kappas = post_params[:,1]
@@ -58,7 +73,10 @@ def gaussian1d_predict(post_params, xnew, dpost_params):
     predictive_variance = betas * (kappas + 1) / (alphas * kappas)
     df = 2 * alphas
         
-    pred, dtpdf = studentpdf(xnew, mus, predictive_variance, df)
+    if (nargout==1):        
+        pred = studentpdf(xnew, mus, predictive_variance, df)
+        return pred
+    pred, dtpdf = studentpdf(xnew, mus, predictive_variance, df, 2)
     dmu_dtheta = np.transpose(dpost_params[0],[1,0])
     dkappa_dtheta = np.transpose(dpost_params[1],[1,0])
     dalpha_dtheta = np.transpose(dpost_params[2],[1,0])
@@ -77,7 +95,7 @@ def gaussian1d_predict(post_params, xnew, dpost_params):
     
     return pred, dpred
 
-def  gaussian1D_update(theta_prior, post_params, xt, dpost_params):
+def  gaussian1D_update(theta_prior, post_params, xt, dpost_params=None, nargout=1):
 
     mus = post_params[:,0]
     kappas = post_params[:,1]
@@ -89,6 +107,8 @@ def  gaussian1D_update(theta_prior, post_params, xt, dpost_params):
     alphas_new = np.concatenate(([theta_prior[2]], alphas + 0.5))
     betas_new = np.concatenate(([theta_prior[3]], betas + (kappas * (xt - mus) ** 2) / (2 * (kappas + 1))))
     post_params = np.array([mus_new, kappas_new, alphas_new, betas_new]).swapaxes(0,1)
+    if(nargout==1):
+        return post_params
 
     dmu_dmu0 = dpost_params[0, 0]
     dmu_dkappa0 = dpost_params[0, 1]
@@ -117,7 +137,7 @@ def  gaussian1D_update(theta_prior, post_params, xt, dpost_params):
     
     return post_params, dpost_params    
 
-def bocpd_deriv(theta_h, theta_m, X):
+def bocpd_deriv(theta_h, theta_m, X, hazard_f, model_f):
 
     num_hazard_params = len(theta_h)
     num_model_params = len(theta_m)
@@ -133,12 +153,12 @@ def bocpd_deriv(theta_h, theta_m, X):
     dZ_h = np.zeros([T, num_hazard_params])
     dZ_m = np.zeros([T, num_model_params])
     
-    post_params, dmessage = gaussian1d_init(T + 1, D, theta_m)
+    post_params, dmessage = eval(model_f+'_init')(T + 1, D, theta_m, 2)
     
     for t in range(0,T):
 
-        predprobs, dpredprobs = gaussian1d_predict(post_params, X[t], dmessage)
-        H, dH = logistic_h(np.arange(t+1)+1, theta_h)       
+        predprobs, dpredprobs = eval(model_f+'_predict')(post_params, X[t], dmessage, 2)
+        H, dH = eval(hazard_f)(np.arange(t+1)+1, theta_h, 2)       
         R[1:t + 2, t + 1] = R[:t+1, t] * predprobs * (1 - H)        
         for ii in range(num_hazard_params):
             dR_h[1:t + 2, t + 1, ii] = predprobs * (dR_h[:t+1, t, ii]  * (1 - H) - R[:t+1, t] * dH[:,ii])
@@ -160,7 +180,7 @@ def bocpd_deriv(theta_h, theta_m, X):
         for ii in range(num_model_params):
             dR_m[:t + 2, t + 1, ii] = (dR_m[:t + 2, t + 1, ii] / Z[t]) - (dZ_m[t, ii] * R[:t + 2, t + 1]) / (Z[t] ** 2)
         R[:t + 2, t + 1] = R[:t + 2, t + 1] /  Z[t]
-        post_params, dmessage = gaussian1D_update(theta_m, post_params, X[t], dmessage)
+        post_params, dmessage = eval(model_f+'_update')(theta_m, post_params, X[t], dmessage, 2)
     nlml = -sum(np.log(Z))
     dnlml_h = np.zeros(num_hazard_params)
     dnlml_m = np.zeros(num_model_params)
@@ -169,17 +189,16 @@ def bocpd_deriv(theta_h, theta_m, X):
     for ii in range(num_model_params):
         dnlml_m[ii] = -np.sum(dZ_m[:, ii] / Z)
     
-    return nlml, dnlml_h, dnlml_m, Z, dZ_h, dZ_m, R, dR_h, dR_m
+    return nlml, dnlml_h, dnlml_m#, Z , dZ_h, dZ_m, R, dR_h, dR_m
 
 def rt_minimize(X, f, length, *varargin):
-    
 
-    INT = 0.1    # don't reevaluate within 0.1 of the limit of the current bracket
-    EXT = 3.0                  # extrapolate maximum 3 times the current step-size
-    MAX = 20                         # max 20 function evaluations per line search
-    RATIO = 10                                       # maximum allowed slope ratio
+    INT = 0.1   
+    EXT = 3.0   
+    MAX = 20    
+    RATIO = 10  
     SIG = 0.1 
-    RHO = SIG/2 # SIG and RHO are the constants controlling the Wolfe-
+    RHO = SIG/2
 
     red = 1
     S='Function evaluation'
@@ -270,39 +289,45 @@ def rt_minimize(X, f, length, *varargin):
             s = -df0; d0 = -np.sum(s*s)
             x3 = 1/(1-d0)
             ls_failed = 1
-    return X, fX, i
+    return X, fX#, i
 
-def bocpd_dwrap1D(theta0, X, conversion, num_hazard_params):
+def bocpd_dwrap1D(theta0, X, model_f, hazard_f, conversion, num_hazard_params):
 
     theta = theta0.copy()
-    # Warning: this code assumes: theta_h are in logit scale, theta_m(1) is in
-    # linear, and theta_m(2:end) are in log scale!
     theta[conversion == 2] = 1 / (1 + np.exp(-theta[conversion == 2]))
     theta[conversion == 1] = np.exp(theta[conversion == 1])
 
-    # Seperate theta into hazard and model hypers
     theta_h = theta[:num_hazard_params]
     theta_m = theta[num_hazard_params:]
-    [nlml, dnlml_h, dnlml_m, _, _, _, _, _, _] = bocpd_deriv(theta_h, theta_m, X)
-    # Put back into one vector for minimize
+    nlml, dnlml_h, dnlml_m = bocpd_deriv(theta_h, theta_m, X, hazard_f, model_f)
+    
     dnlml = np.concatenate((dnlml_h, dnlml_m))
 
-    # Correct for the distortion
     dnlml[conversion == 2] = dnlml[conversion == 2] * theta[conversion == 2] * (1 - theta[conversion == 2])
     dnlml[conversion == 1] = dnlml[conversion == 1] * theta[conversion == 1]
     return nlml, dnlml
 
 def learn_bocpd(X, useLogistic):
 
-    max_minimize_iter = 5
+    max_minimize_iter = 30
 
-    num_hazard_params = 3   
-    hazard_init = np.array([np.log(.01/(1-.01)),0,0])
-    model_init = np.array([0,np.log(.1),np.log(.1),np.log(.1)])
-    conversion = np.array([2,0,0,0,1,1,1])
-
+    if useLogistic:
+        model_f = 'gaussian1D'
+        hazard_f = 'logistic_h'
+        num_hazard_params = 3
+        hazard_init = np.array([np.log(.01/(1-.01)),0,0])
+        model_init = np.array([0,np.log(.1),np.log(.1),np.log(.1)])
+        conversion = np.array([2,0,0,0,1,1,1])
+    else:
+        model_f = 'gaussian1D'
+        hazard_f = 'constant_h'
+        num_hazard_params = 1
+        hazard_init = np.array(np.log(.01/(1-.01)))
+        model_init = np.array([0,np.log(.1),np.log(.1),np.log(.1)])
+        conversion = np.array([2,0,1,1,1])
+    
     theta = np.concatenate((hazard_init,model_init))
-    theta, nlml, _ = rt_minimize(theta, bocpd_dwrap1D, -max_minimize_iter, X, conversion, num_hazard_params)
+    theta, nlml = rt_minimize(theta, bocpd_dwrap1D, -max_minimize_iter, X, model_f, hazard_f, conversion, num_hazard_params)
 
     hazard_params = theta[:num_hazard_params]
     model_params = theta[num_hazard_params:]
@@ -312,29 +337,126 @@ def learn_bocpd(X, useLogistic):
     
     return hazard_params, model_params, nlml
 
+def bocpd(X, model_f, theta_m, hazard_f, theta_h):
+    
+    T = len(X)    
+    D = 1
+    R = np.zeros([T + 1, T + 1])
+    S = np.zeros([T, T])
+    R[0,0] = 1
+
+    Z = np.zeros(T)    
+    post_params = eval(model_f+'_init')(T + 1, D, theta_m)
+    
+    for t in range(0,T):
+
+        predprobs = eval(model_f+'_predict')(post_params, X[t])
+        H = eval(hazard_f)(np.arange(t+1)+1, theta_h)       
+        R[1:t + 2, t + 1] = R[:t+1, t] * predprobs * (1 - H)        
+        R[0, t + 1] = np.sum(R[:t+1, t] * predprobs * H)
+        Z[t] =  sum(R[:t + 2, t + 1])
+        R[:t + 2, t + 1] = R[:t + 2, t + 1] /  Z[t]
+        S[:t+1, t] = R[:t+1, t] * predprobs
+        S[:, t] = S[:, t] / np.sum(S[:, t])
+        post_params = eval(model_f+'_update')(theta_m, post_params, X[t])
+    nlml = -sum(np.log(Z))
+    
+    return R, S, nlml, Z
+
+def convertToAlert(Rs, thold):
+
+    max_run, T = Rs.shape
+    last_alarm = np.inf
+    alert = np.zeros(T)
+    for ii in range(T):
+        alert[ii],last_alarm = convertToAlertSingle(Rs[:, ii], last_alarm, thold)
+    return alert
+
+def convertToAlertSingle(Rs, last_alarm, thold):
+    if last_alarm > len(Rs):
+        last_alarm = len(Rs)
+
+    changePointProb = np.sum(Rs[:last_alarm+1])
+    if changePointProb >= thold:
+        alert = True
+        last_alarm = 1
+    else:
+        alert = False
+        last_alarm = last_alarm + 1
+
+    return alert, last_alarm
+
+def getMedianRunLength(S):
+    T = S.shape[1]
+    cdf = np.cumsum(S,0)
+    secondHalf = (cdf >= .5)
+    Mrun = np.zeros(T)
+    for ii in range(T):
+        Mrun[ii] = np.amin(np.where(secondHalf[:, ii]))
+    MchangeTime = np.arange(T) - Mrun + 1
+    return Mrun#, MchangeTime
+
+def plotS(S, X):
+
+    alertThold = .5
+    
+    plt.subplot(2, 1, 1)
+    plt.plot(X)
+    alert = convertToAlert(S, alertThold)
+    plt.plot(np.where(alert),0,'rx')
+    
+    plt.axis('tight')
+    plt.grid()
+
+    plt.subplot(2, 1, 2)
+    plt.imshow(np.cumsum(S,0),cmap='gray')
+    Mrun = getMedianRunLength(S)
+    plt.plot(Mrun, 'r-')
+    plt.axis('tight')
+
 
 if __name__ == '__main__':
     print('Trying well log data')
 
-    # I think all this code is deterministic, but let's fix the seed to be safe.
     random.seed(4)
 
     well = np.genfromtxt('data/well.dat')
     
-    # We don't know the physical interpretation, so lets just standardize the
-    # readings to make them cleaner.
     X = (well - np.mean(well,axis=0))/(np.finfo(float).tiny + np.std(well,axis=0))        
     Tlearn = 2000
     Ttest = X.shape[0] - Tlearn
+    
     useLogistic = True
-
-    # TODO compare logistic h and constant h
-    # Can try learn_IFM usinf IFMfast to speed this up
     print('Starting learning')
-    well_hazard, well_model, well_learning = learn_bocpd(X[:Tlearn], useLogistic)    
+    well_hazard, well_model, well_learning = learn_bocpd(X[:Tlearn],useLogistic)    
     print('Learning Done')
 
     print('Testing')
-    ###bocpd(X, well_model', 'logistic_h', well_hazard');
+    well_R, well_S, well_nlml, Z = bocpd(X, 'gaussian1D', well_model, 'logistic_h', well_hazard)
     print('Done Testing')
+    nlml_score = -np.sum(np.log(Z[Tlearn:])) / Ttest
     
+    rpa_hazard = np.array([1 / 250])
+    rpa_mu0 = 1.15e5
+    rpa_mu_sigma = 1e4
+    rpa_mu0 = (rpa_mu0 - np.mean(well)) / np.std(well)
+    rpa_mu_sigma = rpa_mu_sigma / np.std(well)
+    
+    rpa_kappa = 1 / rpa_mu_sigma **2
+
+    rpa_alpha = 1
+    rpa_beta = rpa_kappa
+    rpa_model = np.array([rpa_mu0,1,rpa_alpha,rpa_beta])
+    well_R, well_S_rpa, well_nlml_rpa, Z_rpa = bocpd(X, 'gaussian1D', rpa_model, 'constant_h', rpa_hazard)
+    
+    nlml_score_rpa = -np.sum(np.log(Z_rpa[Tlearn:])) / Ttest
+    TIM_nlml = -np.sum(norm.logpdf(X[Tlearn:])) / Ttest
+
+    plt.figure(figsize=(8,7))
+    plotS(well_S, X)
+    plt.title(['RDT '+str(nlml_score)])
+    
+    plt.figure(figsize=(8,7))
+    plotS(well_S_rpa, X)
+    plt.title(['RPA '+str(nlml_score_rpa)])    
+    plt.show()
