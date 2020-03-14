@@ -1,4 +1,4 @@
-% function Z = rmult(X, Y)
+ % function Z = rmult(X, Y)
 %
 % row multiplication: Z = X * Y row-wise
 % Y must have one column 

@@ -16,6 +16,7 @@ rand('state', 4);
 
 if useReal
   load data/30_industry.mat;
+  dlmwrite('../../data/thirty_industry.dat',thirty_industry,'precision','%d')
 
   % get the time stamp out of the matrix
   year = floor(thirty_industry(:, 1) / 10000);
