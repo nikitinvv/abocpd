@@ -80,4 +80,4 @@ if __name__ == '__main__':
     ax.xaxis.set_major_locator(years)
     ax.xaxis.set_major_formatter(yearsFmt)
     plt.show()
-    exit()
+    
