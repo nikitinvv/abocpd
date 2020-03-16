@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     Tlearn = 1000
     thirty_industry = np.genfromtxt(
-        'data/thirty_industry.dat', delimiter=",")[:, :4]
+        'data/thirty_industry.dat', delimiter=",")[:, :]
     year = np.floor(thirty_industry[:, 0] / 10000).astype('int')
     month = np.mod(np.floor(thirty_industry[:, 0] / 100), 100).astype('int')
     day = np.mod(thirty_industry[:, 0], 100).astype('int')
