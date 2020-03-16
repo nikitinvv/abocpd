@@ -7,7 +7,7 @@ close all
 
 disp('Trying industry portfolio data');
 
-Tlearn = 3000;
+Tlearn = 1000;
 useReal = true;
 
 % I think all this code is deterministic, but let's fix the seed to be safe.
@@ -17,6 +17,7 @@ rand('state', 4);
 if useReal
   load data/30_industry.mat;
   dlmwrite('../../data/thirty_industry.dat',thirty_industry,'precision','%d')
+  thirty_industry = thirty_industry(1:end,1:end)
 
   % get the time stamp out of the matrix
   year = floor(thirty_industry(:, 1) / 10000);
@@ -57,14 +58,13 @@ for ii = 1:D
   toc
 
   [R, S, nlml, Z(:, ii)] = bocpd_sparse( ...
-    industry_hazard(:, ii)', industry_model(:, ii)', X(:, ii), ...
-    'logistic_h', 'IFM', .001);
+   industry_hazard(:, ii)', industry_model(:, ii)', X(:, ii), ...
+   'logistic_h', 'IFM', .001);
 
   % initilializer for next iteration
   theta_init = [mean(industry_hazard(:, 1:ii), 2); ...
-    mean(industry_model(:, 1:ii), 2)];
+    mean(industry_model(:, 1:ii), 2)];  
 end
-
 nlml_score = -sum2(log(Z(Tlearn + 1:end, :))) / Ttest;
 
 disp('Learn the joint');
@@ -114,46 +114,47 @@ Mrun = getMedianRunLength(industry_S);
 hold on;
 plot(time, Mrun, 'r-');
 hold off;
-datetick;
+datetick('x','yyyy','keeplimits')
 
-%Annotated results for heavy-tailed
-figure; 
-colormap gray;
-start = datenum('20.07.1998','dd.mm.yyyy');
-finish = time(end);
-startind = find(time >= start);
-startind = startind(1);
-finishind = find(time >= finish);
-finishind = finishind(1);
-imagesc(time(startind:finishind), 1:size(industry_SH,1), cumsum(industry_SH(:,startind:finishind)));
-historic = [datenum('05.08.1998', 'dd.mm.yyyy'), datenum('10.03.2000','dd.mm.yyyy'), datenum('11.09.2001','dd.mm.yyyy'), ...
-    datenum('26.06.2003','dd.mm.yyyy'), datenum('02.11.2004','dd.mm.yyyy'), datenum('01.09.2007','dd.mm.yyyy'), datenum('15.09.2008', 'dd.mm.yyyy')];
-%05/08/1998 -> Asia crisis and dot-com bubble
-%10/03/2000 -> dot-com bubble burst
-%11/09/2001
-%26/06/2003 -> interest rate cut
-%02/11/2004 -> US election
-%01/09/2007 -> Northern Rock bank run, circa beginning of credit crunch
-%15/09/2008 -> Lehman Brothers collapse, height of credit crunch
-hold on; 
-plot(historic, ones(size(historic)), 'g*', 'MarkerSize', 10);
-datetick('x');
-[Mrun, MT] = getMedianRunLength(industry_SH);
-plot(time(startind:finishind), Mrun(startind:finishind), 'r-');
-axis tight;
-hold off;
-
-figure;
-timesub = time(startind:finishind);
-tMT = time(MT);
-MTsub = tMT(startind:finishind);
-plot(timesub, MTsub);
-set(gca, 'YTick', timesub(1):7:timesub(end));
-datetick('x'); datetick('y',20,'keepticks');
-grid;
-
-% plotS(industry_S, X, [], time);
-% title(['Joint ' num2str(nlml_score_joint)]);
+% %Annotated results for heavy-tailed
+% figure; 
+% colormap gray;
+% %start = datenum('20.07.1965','dd.mm.yyyy');
+% start = datenum('20.07.1998','dd.mm.yyyy');
+% finish = time(end);
+% startind = find(time >= start);
+% startind = startind(1);
+% finishind = find(time >= finish);
+% finishind = finishind(1);
+% imagesc(time(startind:finishind), 1:size(industry_SH,1), cumsum(industry_SH(:,startind:finishind)));
+% historic = [datenum('05.08.1998', 'dd.mm.yyyy'), datenum('10.03.2000','dd.mm.yyyy'), datenum('11.09.2001','dd.mm.yyyy'), ...
+%     datenum('26.06.2003','dd.mm.yyyy'), datenum('02.11.2004','dd.mm.yyyy'), datenum('01.09.2007','dd.mm.yyyy'), datenum('15.09.2008', 'dd.mm.yyyy')];
+% %05/08/1998 -> Asia crisis and dot-com bubble
+% %10/03/2000 -> dot-com bubble burst
+% %11/09/2001
+% %26/06/2003 -> interest rate cut
+% %02/11/2004 -> US election
+% %01/09/2007 -> Northern Rock bank run, circa beginning of credit crunch
+% %15/09/2008 -> Lehman Brothers collapse, height of credit crunch
+% hold on; 
+% plot(historic, ones(size(historic)), 'g*', 'MarkerSize', 10);
+% datetick('x');
+% [Mrun, MT] = getMedianRunLength(industry_SH);
+% plot(time(startind:finishind), Mrun(startind:finishind), 'r-');
+% axis tight;
+% hold off;
 % 
-% plotS(industry_SH, Xprime, [], time);
-% title(['Heavy ' num2str(nlml_score_heavy)]);
+% figure;
+% timesub = time(startind:finishind);
+% tMT = time(MT);
+% MTsub = tMT(startind:finishind);
+% plot(timesub, MTsub);
+% set(gca, 'YTick', timesub(1):7:timesub(end));
+% datetick('x'); datetick('y',20,'keepticks');
+% grid;
+% 
+% % plotS(industry_S, X, [], time);
+% % title(['Joint ' num2str(nlml_score_joint)]);
+% % 
+% % plotS(industry_SH, Xprime, [], time);
+% % title(['Heavy ' num2str(nlml_score_heavy)]);

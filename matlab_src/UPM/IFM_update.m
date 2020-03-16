@@ -18,8 +18,11 @@ function [post_params, dpost_params] = ...
 % need to move to using unpackFromVector (because of x N replication we'll need
 % to make a function unpackFromMatrix).
 
+
+    
 N = size(post_params, 1);
 D = length(xt);
+
 num_params = size(post_params, 2);
 assert(num_params == 4 * D);
 
@@ -46,6 +49,7 @@ kappas_new = zeros(N + 1, D);
 alphas_new = zeros(N + 1, D);
 betas_new = zeros(N + 1, D);
 % Could probably do this loop with rplus (bsxfun) instead.
+
 for ii = 1:D
   % TODO pre-allocate post_params so it doesn't need to grow every iteration.
   % If we permute updates: beta, mu, kappa, alpha then we can work in place and

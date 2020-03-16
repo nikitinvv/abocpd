@@ -120,12 +120,6 @@ end
 [tmp, dtpdf] = studentpdffast(xnew, mus, predictive_variance, df); % N x 1. [P/x]
 dp_dtheta = zeros(N, D, 4);
 
-
-
-%%%CONTINUE HERE
-
-
-
 for ii = 1:D
   dmu_dtheta = dpost_params(1:N, :, 1, ii); % N x 4
   dkappa_dtheta = dpost_params(1:N, :, 2, ii); % N x 4
