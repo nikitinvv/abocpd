@@ -68,6 +68,9 @@ if __name__ == '__main__':
     TIM_nlml = - \
         np.sum((-0.5 * Xprime[Tlearn:, :]**2) - np.log(np.sqrt(2*np.pi)))/Ttest
 
+    np.save('industry_S',industry_S)
+    print('Array industry_S is saved in industry_S.npy')
+    
     fig, ax = plt.subplots()
     plt.imshow(np.cumsum(industry_S, axis=0)[
                ::-1], extent=[time[0], time[-1], 1, industry_S.shape[0]])
