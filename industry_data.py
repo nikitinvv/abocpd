@@ -19,7 +19,7 @@ if __name__ == '__main__':
     month = np.mod(np.floor(thirty_industry[:, 0] / 100), 100).astype('int')
     day = np.mod(thirty_industry[:, 0], 100).astype('int')
     time = np.array([date.toordinal(date(year[i], month[i], day[i])) for i in range(
-        len(year))])  # note: python and matlab representations are different
+        len(year))])   note: python and matlab representations are different
     X = whitten(thirty_industry[:, 1:], Tlearn)
 
     [T, D] = X.shape
@@ -68,10 +68,10 @@ if __name__ == '__main__':
     TIM_nlml = - \
         np.sum((-0.5 * Xprime[Tlearn:, :]**2) - np.log(np.sqrt(2*np.pi)))/Ttest
 
-    np.save('industry_S',industry_S)
+    industry_S=np.save('industry_S',industry_S)
     print('Array industry_S is saved in industry_S.npy')
-    
-    fig, ax = plt.subplots()
+   
+    fig, ax = plt.subplots(figsize=(20,5))
     plt.imshow(np.cumsum(industry_S, axis=0)[
                ::-1], extent=[time[0], time[-1], 1, industry_S.shape[0]])
     plt.gca().invert_yaxis()
@@ -82,5 +82,9 @@ if __name__ == '__main__':
     yearsFmt = mdates.DateFormatter('%Y')
     ax.xaxis.set_major_locator(years)
     ax.xaxis.set_major_formatter(yearsFmt)
+    plt.xticks(rotation=90)
+    ax.set_aspect('auto')
+    plt.savefig('result.png')
+    print('Plot is saved as result.pngArray')
     plt.show()
     
