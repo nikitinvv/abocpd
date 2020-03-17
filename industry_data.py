@@ -19,7 +19,7 @@ if __name__ == '__main__':
     month = np.mod(np.floor(thirty_industry[:, 0] / 100), 100).astype('int')
     day = np.mod(thirty_industry[:, 0], 100).astype('int')
     time = np.array([date.toordinal(date(year[i], month[i], day[i])) for i in range(
-        len(year))])   note: python and matlab representations are different
+        len(year))])   #note: python and matlab representations are different
     X = whitten(thirty_industry[:, 1:], Tlearn)
 
     [T, D] = X.shape
