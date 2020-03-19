@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     random.seed(4)
 
-    Tlearn = 1000
+    Tlearn = 5000
     thirty_industry = np.genfromtxt(
         'data/thirty_industry.dat', delimiter=",")[:, :]
     year = np.floor(thirty_industry[:, 0] / 10000).astype('int')
@@ -21,7 +21,6 @@ if __name__ == '__main__':
     time = np.array([date.toordinal(date(year[i], month[i], day[i])) for i in range(
         len(year))])   #note: python and matlab representations are different
     X = whitten(thirty_industry[:, 1:], Tlearn)
-
     [T, D] = X.shape
     Ttest = T - Tlearn
 
@@ -30,6 +29,7 @@ if __name__ == '__main__':
     industry_model = np.zeros([4, D])
     industry_learning = [None]*D
     Z = np.zeros([T, D])
+    
     theta_init = None
     for ii in range(D):
         print(ii)
@@ -37,10 +37,12 @@ if __name__ == '__main__':
             X[:Tlearn, ii:ii+1], True, theta_init)
         R, S, nlml, Z[:, ii] = bocpd_sparse(
             industry_hazard[:, ii], industry_model[:, ii], X[:, ii:ii+1], 'logistic_h', 'IFM', .001)
+
         theta_init = np.concatenate((np.mean(
             industry_hazard[:, :ii+1], axis=1), np.mean(industry_model[:, :ii+1], axis=1)))
+            
+        print(theta_init)
     nlml_score = -np.sum(np.log(Z[Tlearn:, :])) / Ttest
-
     print('Learn the joint')
     tmp = industry_model
     theta_init = np.concatenate(
@@ -55,7 +57,9 @@ if __name__ == '__main__':
     nlml_score_joint = -np.sum(np.log(Zjoint[Tlearn:])) / Ttest
     TIM_nlml = -np.sum((-0.5 * X[Tlearn:, :]**2) -
                        np.log(np.sqrt(2*np.pi)))/Ttest
-    
+    print('nlml_score',nlml_score)
+    print('nlml_score_joint',nlml_score_joint)
+    print('TIM_nlml',TIM_nlml)
     df = 4
     Xprime = t.cdf(X, df)
     Xprime = norm.ppf(Xprime)
@@ -67,8 +71,11 @@ if __name__ == '__main__':
     nlml_score_joint = -np.sum(np.log(Zheavy[Tlearn:])) / Ttest
     TIM_nlml = - \
         np.sum((-0.5 * Xprime[Tlearn:, :]**2) - np.log(np.sqrt(2*np.pi)))/Ttest
-
-    industry_S=np.save('industry_S',industry_S)
+    print('nlml_score',nlml_score)
+    print('nlml_score_joint',nlml_score_joint)
+    print('TIM_nlml',TIM_nlml)
+    np.save('industry_S',industry_S)
+    
     print('Array industry_S is saved in industry_S.npy')
    
     fig, ax = plt.subplots(figsize=(20,5))
@@ -84,7 +91,7 @@ if __name__ == '__main__':
     ax.xaxis.set_major_formatter(yearsFmt)
     plt.xticks(rotation=90)
     ax.set_aspect('auto')
-    plt.savefig('result.png')
-    print('Plot is saved as result.pngArray')
+    plt.savefig('result5000.png')
+    print('Plot is saved as result.png')
     plt.show()
     

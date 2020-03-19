@@ -474,13 +474,14 @@ def rt_minimize(X, f, length, *varargin):
 
     i = 0
     ls_failed = 0
-    f0, df0 = f(X, *varargin)
+    f0, df0 = f(X, *varargin)    
     fX = [f0]
     i = i + (length < 0)
     s = -df0
     d0 = -np.sum(s*s)
     x3 = red/(1-d0)
-
+    
+    
     while i < abs(length):
         i = i + (length > 0)
         X0 = X
@@ -503,7 +504,6 @@ def rt_minimize(X, f, length, *varargin):
                         raise Exception('error')
                     success = 1
                 except Exception as ex:
-                    print(ex.args)
                     x3 = (x2+x3)/2
             if f3 < F0:
                 X0 = X+x3*s
@@ -648,7 +648,7 @@ def learn_IFM(X, useLogistic, init=None):
         conversion[1+D:] = 1
 
     if(init is not None):
-        theta = init
+        theta = init.copy()
         theta[conversion == 2] = np.log(
             theta[conversion == 2]/(1-theta[conversion == 2]))
         theta[conversion == 1] = np.log(theta[conversion == 1])
@@ -717,13 +717,14 @@ def bocpd_sparse(theta_h, theta_m, X, hazard_f, model_f, epsilon):
         Z[t] = np.sum(Rnew)
         Rnew = Rnew / Z[t]
         Rpruned, _ = pruneR(Rnew, epsilon)
-        maxRunConsidered = Rpruned.shape[0]
+        maxRunConsidered = Rpruned.shape[0]        
         R[t + 1] = Rpruned
         S[t] = R[t] * predprobs
         S[t] = S[t] / sum(S[t])
 
         post_params = eval(model_f+'_update')(theta_m,
                                               post_params, X[t], None, maxRunConsidered)
+    print(maxRunConsidered)
 
     nlml = -np.sum(np.log(Z))
     R = convertRtoMatrix(R)
@@ -816,17 +817,21 @@ def bocpd_deriv(theta_h, theta_m, X, hazard_f, model_f):
 def bocpd_dwrap_sp(theta0, X, model_f, hazard_f, conversion, num_hazard_params):
 
     theta = theta0.copy()
+    
     theta[conversion == 2] = 1 / (1 + np.exp(-theta[conversion == 2]))
     theta[conversion == 1] = np.exp(theta[conversion == 1])
+    
     theta_h = theta[:num_hazard_params]
     theta_m = theta[num_hazard_params:]
     nlml, dnlml_h, dnlml_m = bocpd_deriv_sparse(
         theta_h, theta_m, X, hazard_f, model_f, .001)
+
+    
     dnlml = np.concatenate((dnlml_h, dnlml_m))
 
     dnlml[conversion == 2] = dnlml[conversion == 2] * \
         theta[conversion == 2] * (1 - theta[conversion == 2])
-    dnlml[conversion == 1] = dnlml[conversion == 1] * theta[conversion == 1]
+    dnlml[conversion == 1] = dnlml[conversion == 1] * theta[conversion == 1]    
     return nlml, dnlml
 
 
@@ -903,7 +908,6 @@ def bocpd_deriv_sparse(theta_h, theta_m, X, hazard_f, model_f, epsilon):
         dnlml_h[ii] = -np.sum(dZ_h[:, ii] / Z)
     for ii in range(num_model_params):
         dnlml_m[ii] = -np.sum(dZ_m[:, ii] / Z)
-
     return nlml, dnlml_h, dnlml_m  # , Z , dZ_h, dZ_m, R, dR_h, dR_m
 
 
@@ -931,7 +935,7 @@ def whitten(x, N):
 
 def pruneR(R, epsilon):
     prunes = np.argwhere(R >= epsilon)
-    Rpruned = R[:prunes[-1, 0]+1]
+    Rpruned = R[:prunes[-1,0]+1]
     renorm = np.sum(Rpruned)
     Rpruned = Rpruned / renorm
     return Rpruned, renorm
